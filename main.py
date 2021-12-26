@@ -155,6 +155,8 @@ for xlsx_file in os.listdir("../source_files/"):
         data_df_even.insert(data_df_even.shape[1], "Сальдо у валюті",
                             data_df_odd.iloc[:, data_df_odd.shape[1] - 1], True)
 
+        data_df_even.columns.values[data_df_even.shape[1] - 2] = 'Сальдо в грн'
+
         data_df_even.dropna(axis='columns', how='all', inplace=True)
         print(tabulate(data_df_even.head(30), tablefmt='psql'))
         print(tabulate(data_df_odd.head(30), tablefmt='psql'))

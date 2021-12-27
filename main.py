@@ -49,7 +49,12 @@ def parce_args():
 
 logger.info('make dir ../source_files/tmp/')
 
-tmp_folder = '../source_files/tmp/'
+
+tmp_folder = os.path.join(os.path.split('../source_files')[0], os.path.split('../source_files')[1], 'tmp')
+
+logger.info(f'tmp folder: {tmp_folder}')
+
+#tmp_folder = '../source_files/tmp/'
 os.makedirs(tmp_folder, exist_ok=True)
 
 # Set of available currencies than used in 1C
@@ -74,19 +79,35 @@ def xlsx_processing(xlsx_file):
 
     # Переименовываем файл с неверным названием
     wrong_file_path = os.path.join(tmp_folder, base, 'xl', 'SharedStrings.xml')
+    logger.debug(f'wrong_file_path: {wrong_file_path}')
     correct_file_path = os.path.join(tmp_folder, base, 'xl', 'sharedStrings.xml')
-    r = os.rename(wrong_file_path, correct_file_path)
-    logger.debug(r)
+    logger.debug(f'correct_file_path: {correct_file_path}')
+    #with os.open(os.path.join(tmp_folder, base, 'xl'), os.O_RDONLY) as fd:
+    #    os.replace('SharedStrings.xml', 'sharedStrings.xml', src_dir_fd=fd)
+
+    #shutil.copyfile(wrong_file_path, correct_file_path + '_')
+    #shutil.rmtree(wrong_file_path)
+    #shutil.copyfile(correct_file_path + '_', correct_file_path[:-1])
+    #shutil.rmtree(wrong_file_path + '_')
+
+    shutil.move(os.path.abspath(wrong_file_path), os.path.abspath(correct_file_path))
+
+    # try:
+    #     os.remove(wrong_file_path)
+    # except OSError as e:  ## if failed, report it back to the user ##
+    #     print("Error: %s - %s." % (e.filename, e.strerror))
+
+    #os.rename(wrong_file_path, correct_file_path)
 
     # delete mergeCell from sheet1.xml
 
-    worksheet_folder = tmp_folder + '/' + base + "/xl/worksheets/"
+    worksheet_folder = os.path.join(tmp_folder, base, "xl", "worksheets")
 
     for xml_file in os.listdir(worksheet_folder):
         if xml_file.endswith(".xml"):
             logger.info(f'start with {xml_file}')
 
-            with open(worksheet_folder + xml_file, "r", encoding='utf-8') as w:
+            with open(os.path.join(worksheet_folder, xml_file), "r", encoding='utf-8') as w:
                 lines = w.readlines()
             with open(worksheet_folder + xml_file, "w", encoding='utf-8') as w:
                 for line in lines:
@@ -263,6 +284,7 @@ if __name__ == '__main__':
     logger.info(f'Done!')
 
     time.sleep(0.1)
+    print('\a')
     input('Press ENTER to exit')
     exit()
 

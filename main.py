@@ -69,21 +69,21 @@ def xlsx_processing(xlsx_file):
     logger.info(f'start with file {xlsx_file}')
     with ZipFile("../source_files/" + xlsx_file) as excel_container:
         logger.debug(f'start unpack file {xlsx_file}')
-        excel_container.extractall(tmp_folder)
-        logger.debug(f'finush unpack file {xlsx_file}')
+        excel_container.extractall(tmp_folder + '/' + base)
+        logger.debug(f'finish unpack file {xlsx_file}')
 
     # Переименовываем файл с неверным названием
-    wrong_file_path = os.path.join(tmp_folder, 'xl', 'SharedStrings.xml')
-    correct_file_path = os.path.join(tmp_folder, 'xl', 'sharedStrings.xml')
-    os.rename(wrong_file_path, correct_file_path)
+    wrong_file_path = os.path.join(tmp_folder, base, 'xl', 'SharedStrings.xml')
+    correct_file_path = os.path.join(tmp_folder, base, 'xl', 'sharedStrings.xml')
+    r = os.rename(wrong_file_path, correct_file_path)
+    logger.debug(r)
 
     # delete mergeCell from sheet1.xml
 
-    worksheet_folder = tmp_folder + "/xl/worksheets/"
+    worksheet_folder = tmp_folder + '/' + base + "/xl/worksheets/"
 
     for xml_file in os.listdir(worksheet_folder):
         if xml_file.endswith(".xml"):
-            # print(f'{datetime.now().strftime("%H:%M:%S")}: start with {xml_file}')
             logger.info(f'start with {xml_file}')
 
             with open(worksheet_folder + xml_file, "r", encoding='utf-8') as w:
@@ -93,24 +93,20 @@ def xlsx_processing(xlsx_file):
                     if "mergeCell" not in line:
                         w.write(line)
 
-    # Удаляем файл с таким же имененм в папке с результатами
-    # try:
-    #    shutil.rmtree(tmp_folder)
-    # except OSError as e:
-    #    print("Error: %s - %s." % (e.filename, e.strerror))
     try:
         if os.path.exists("../result_files/" + new_file_name):
             os.remove("../result_files/" + new_file_name)
         # Запаковываем excel обратно в zip и переименовываем в исходный файл
-        shutil.make_archive(base, 'zip', tmp_folder)
+        shutil.make_archive(base, 'zip', os.path.join(tmp_folder, base))
         os.rename(base + '.zip', "../result_files/" + new_file_name)
     except Exception as e:
         print("Error: %s." % e)
 
+    dataframe_processing("../result_files/" + new_file_name, "../result_files/" + new_file_name)
 
-def xls_processing(xls_file):
-    logger.info(f'start with file {xlsx_file}')
-    df = pd.read_excel("../source_files/" + xlsx_file, header=None)
+
+def dataframe_processing(source_file, result_file):
+    df = pd.read_excel(source_file, header=None)
 
     short_df = df.head(30).copy(deep=True)
     logger.debug(f'df.columns: {df.columns}')
@@ -118,9 +114,9 @@ def xls_processing(xls_file):
     header_raw = 0
     currencies_columns = set()
     my_tb_start = []
-    for i in range(short_df.shape[0]):  # iterate over rows
-        for j in range(short_df.shape[1]):  # iterate over columns
-            value = short_df.at[i, j]  # get cell value
+    for i in range(df.shape[0]):  # iterate over rows
+        for j in range(df.shape[1]):  # iterate over columns
+            value = df.at[i, j]  # get cell value
 
             if "Документ" in str(value) and header_raw == 0:
                 header_raw = i
@@ -160,7 +156,8 @@ def xls_processing(xls_file):
     data_df.columns.values[data_df.shape[1] - 1] = 'Сальдо в грн/Сальдо у валюті'
 
     data_df = data_df.reset_index(drop=True)
-    data_df.drop(['Показник'], axis=1, inplace=True)
+    data_df.drop(['Показник'], axis=1, inplace=True, errors='ignore')
+    data_df.drop(['Показатель'], axis=1, inplace=True, errors='ignore')
     data_df.dropna(axis=1, how='all')
     data_df_even = data_df.iloc[::2]  # copy all even elements to new dataframe
     data_df_odd = data_df.iloc[1::2]  # copy all odd elements to new dataframe
@@ -196,7 +193,12 @@ def xls_processing(xls_file):
     logger.debug(tabulate(data_df_odd.head(10), tablefmt='psql'))
     logger.debug(data_df_odd.columns)
 
-    rename_xlsx_file("../result_files/" + base + '.xlsx', data_df_even)
+    rename_xlsx_file(result_file, data_df_even)
+
+
+def xls_processing(xls_file):
+    logger.info(f'start with file {xls_file}')
+    dataframe_processing("../source_files/" + xls_file, "../result_files/" + base + '.xlsx')
 
 
 def rename_xlsx_file(file_name, df):
@@ -207,7 +209,7 @@ def rename_xlsx_file(file_name, df):
         logger.error(e)
         time.sleep(0.1)
         if input(f'Please, close file {file_name}\nAnd try again. Please, type [Y] for retry or any other for cancel:') == 'Y':
-            rename_xlsx_file(file_name)
+            rename_xlsx_file(file_name, data_df_even)
         else:
             logger.error(f'break with {file_name}')
 

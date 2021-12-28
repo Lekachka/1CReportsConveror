@@ -68,40 +68,30 @@ currency_set = {"AUD", "BGN", "KRW", "HKD", "DKK", "USD", "PLN", "EUR",
 def xlsx_processing(xlsx_file):
     base = os.path.splitext(os.path.basename(xlsx_file))[0]
 
+    new_base = base.replace(' ', '_')
+
     new_file_name = base + '.xlsx'
 
     # Распаковываем excel как zip в нашу временную папку
     logger.info(f'start with file {xlsx_file}')
     with ZipFile("../source_files/" + xlsx_file) as excel_container:
         logger.debug(f'start unpack file {xlsx_file}')
-        excel_container.extractall(tmp_folder + '/' + base)
+        excel_container.extractall(tmp_folder + '/' + new_base)
         logger.debug(f'finish unpack file {xlsx_file}')
 
     # Переименовываем файл с неверным названием
-    wrong_file_path = os.path.join(tmp_folder, base, 'xl', 'SharedStrings.xml')
-    logger.debug(f'wrong_file_path: {wrong_file_path}')
-    correct_file_path = os.path.join(tmp_folder, base, 'xl', 'sharedStrings.xml')
-    logger.debug(f'correct_file_path: {correct_file_path}')
-    #with os.open(os.path.join(tmp_folder, base, 'xl'), os.O_RDONLY) as fd:
-    #    os.replace('SharedStrings.xml', 'sharedStrings.xml', src_dir_fd=fd)
+    wrong_file_path = os.path.join(tmp_folder, new_base, 'xl', 'SharedStrings.xml')
+    logger.debug(f'wrong_file_path: {os.path.abspath(wrong_file_path)}')
+    correct_file_path = os.path.join(tmp_folder, new_base, 'xl', 'sharedStrings.xml_')
+    logger.debug(f'correct_file_path: {os.path.abspath(correct_file_path)}')
 
-    #shutil.copyfile(wrong_file_path, correct_file_path + '_')
-    #shutil.rmtree(wrong_file_path)
-    #shutil.copyfile(correct_file_path + '_', correct_file_path[:-1])
-    #shutil.rmtree(wrong_file_path + '_')
-
+    # strange way for file renaming
     shutil.move(os.path.abspath(wrong_file_path), os.path.abspath(correct_file_path))
-
-    # try:
-    #     os.remove(wrong_file_path)
-    # except OSError as e:  ## if failed, report it back to the user ##
-    #     print("Error: %s - %s." % (e.filename, e.strerror))
-
-    #os.rename(wrong_file_path, correct_file_path)
+    shutil.move(os.path.abspath(correct_file_path), os.path.abspath(correct_file_path)[:-1])
 
     # delete mergeCell from sheet1.xml
 
-    worksheet_folder = os.path.join(tmp_folder, base, "xl", "worksheets")
+    worksheet_folder = os.path.join(tmp_folder, new_base, "xl", "worksheets")
 
     for xml_file in os.listdir(worksheet_folder):
         if xml_file.endswith(".xml"):
@@ -109,21 +99,26 @@ def xlsx_processing(xlsx_file):
 
             with open(os.path.join(worksheet_folder, xml_file), "r", encoding='utf-8') as w:
                 lines = w.readlines()
-            with open(worksheet_folder + xml_file, "w", encoding='utf-8') as w:
+            with open(os.path.join(worksheet_folder, xml_file), "w", encoding='utf-8') as w:
                 for line in lines:
                     if "mergeCell" not in line:
                         w.write(line)
 
+    logger.info(f'Creating new zip and renaming to ../result_files/{new_file_name}')
     try:
         if os.path.exists("../result_files/" + new_file_name):
             os.remove("../result_files/" + new_file_name)
         # Запаковываем excel обратно в zip и переименовываем в исходный файл
-        shutil.make_archive(base, 'zip', os.path.join(tmp_folder, base))
+        shutil.make_archive(base, 'zip', os.path.join(tmp_folder, new_base))
         os.rename(base + '.zip', "../result_files/" + new_file_name)
     except Exception as e:
         print("Error: %s." % e)
 
-    dataframe_processing("../result_files/" + new_file_name, "../result_files/" + new_file_name)
+    logger.info(f'DataFrame processing of ../result_files/{new_file_name}')
+    try:
+        dataframe_processing("../result_files/" + new_file_name, "../result_files/" + new_file_name)
+    except Exception as e:
+        logger.error(f'Error in data processing of ../result_files/{new_file_name}. Error is {e}')
 
 
 def dataframe_processing(source_file, result_file):

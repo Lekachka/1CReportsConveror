@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 def set_logger(loc_logger, log_level):
 
-    logger = loc_logger
-    logger.setLevel(logging.DEBUG)
+    #logger = loc_logger
+    loc_logger.setLevel(logging.DEBUG)
 
     # Create handlers
     c_handler = logging.StreamHandler()
@@ -33,11 +33,12 @@ def set_logger(loc_logger, log_level):
     c_handler.setFormatter(c_format)
 
     # Add handlers to the logger
-    logger.addHandler(c_handler)
+    loc_logger.addHandler(c_handler)
 
 
-def parce_args():
-    parser = argparse.ArgumentParser(prog='1C reports parcer', description='Process xls and xlsx reports from 1C program.')
+def parse_args():
+    parser = argparse.ArgumentParser(prog='1C reports parser',
+                                     description='Process xls and xlsx reports from 1C program.')
     parser.add_argument('-l', '--log_level',
                         nargs='?',
                         default='INFO',
@@ -47,18 +48,16 @@ def parce_args():
     args = parser.parse_args()
     return args
 
-logger.info('make dir ../source_files/tmp/')
+TMP_FOLDER = os.path.join('../tmp')
+RESULT_FILES_FOLDER = os.path.join('../result_files')
+SOURCE_FILES_FOLDER = os.path.join('../source_files')
+CONVERTED_FILES_FOLDER = os.path.join('../converted_files')
 
-
-tmp_folder = os.path.join(os.path.split('../source_files')[0], os.path.split('../source_files')[1], 'tmp')
-
-logger.info(f'tmp folder: {tmp_folder}')
-
-#tmp_folder = '../source_files/tmp/'
-os.makedirs(tmp_folder, exist_ok=True)
+# Create tmp folder if not exists
+os.makedirs(TMP_FOLDER, exist_ok=True)
 
 # Set of available currencies than used in 1C
-currency_set = {"AUD", "BGN", "KRW", "HKD", "DKK", "USD", "PLN", "EUR",
+CURRENCY_SET = {"AUD", "BGN", "KRW", "HKD", "DKK", "USD", "PLN", "EUR",
                 "JPY", "CAD", "HRK", "MXN", "NZD", "ILS", "NOK", "SGD",
                 "ZAR", "RON", "HUF", "GBP", "CZK", "SEK", "CHF", "CNY",
                 "XDR", "XAU", "XPD", "XPT", "XAG", 'RUB'
@@ -66,24 +65,24 @@ currency_set = {"AUD", "BGN", "KRW", "HKD", "DKK", "USD", "PLN", "EUR",
 
 
 def xlsx_processing(xlsx_file):
-    base = os.path.splitext(os.path.basename(xlsx_file))[0]
+    base_file_name = os.path.splitext(os.path.basename(xlsx_file))[0]  # file name without extension
 
-    new_base = base.replace(' ', '_')
+    base_name_without_spaces = base_file_name.replace(' ', '_')
 
-    new_file_name = base + '.xlsx'
+    #new_file_name = base_file_name + '.xlsx'
 
     # Распаковываем excel как zip в нашу временную папку
-    logger.info(f'start with file {xlsx_file}')
-    with ZipFile("../source_files/" + xlsx_file) as excel_container:
-        logger.debug(f'start unpack file {xlsx_file}')
-        excel_container.extractall(tmp_folder + '/' + new_base)
-        logger.debug(f'finish unpack file {xlsx_file}')
+    logger.info(f'Start with file {xlsx_file}')
+    with ZipFile(os.path.join(SOURCE_FILES_FOLDER, xlsx_file)) as excel_container:
+        logger.debug(f'Start unpack file {xlsx_file}')
+        excel_container.extractall(TMP_FOLDER + '/' + base_name_without_spaces)
+        logger.debug(f'Finish unpack file {xlsx_file}')
 
     # Переименовываем файл с неверным названием
-    wrong_file_path = os.path.join(tmp_folder, new_base, 'xl', 'SharedStrings.xml')
-    logger.debug(f'wrong_file_path: {os.path.abspath(wrong_file_path)}')
-    correct_file_path = os.path.join(tmp_folder, new_base, 'xl', 'sharedStrings.xml_')
-    logger.debug(f'correct_file_path: {os.path.abspath(correct_file_path)}')
+    wrong_file_path = os.path.join(TMP_FOLDER, base_name_without_spaces, 'xl', 'SharedStrings.xml')
+    logger.debug(f'Wrong_file_path: {os.path.abspath(wrong_file_path)}')
+    correct_file_path = os.path.join(TMP_FOLDER, base_name_without_spaces, 'xl', 'sharedStrings.xml_')
+    logger.debug(f'Correct_file_path: {os.path.abspath(correct_file_path)}')
 
     # strange way for file renaming
     shutil.move(os.path.abspath(wrong_file_path), os.path.abspath(correct_file_path))
@@ -91,11 +90,11 @@ def xlsx_processing(xlsx_file):
 
     # delete mergeCell from sheet1.xml
 
-    worksheet_folder = os.path.join(tmp_folder, new_base, "xl", "worksheets")
+    worksheet_folder = os.path.join(TMP_FOLDER, base_name_without_spaces, "xl", "worksheets")
 
     for xml_file in os.listdir(worksheet_folder):
         if xml_file.endswith(".xml"):
-            logger.info(f'start with {xml_file}')
+            logger.info(f'Delete mergeCell from {xml_file}')
 
             with open(os.path.join(worksheet_folder, xml_file), "r", encoding='utf-8') as w:
                 lines = w.readlines()
@@ -104,24 +103,25 @@ def xlsx_processing(xlsx_file):
                     if "mergeCell" not in line:
                         w.write(line)
 
-    logger.info(f'Creating new zip and renaming to ../result_files/{new_file_name}')
+    logger.info(f'Creating new zip and renaming to {TMP_FOLDER}/{xlsx_file}')
     try:
-        if os.path.exists("../result_files/" + new_file_name):
-            os.remove("../result_files/" + new_file_name)
+        if os.path.exists(os.path.join(TMP_FOLDER, xlsx_file)):
+            os.remove(os.path.join(TMP_FOLDER, xlsx_file))
         # Запаковываем excel обратно в zip и переименовываем в исходный файл
-        shutil.make_archive(base, 'zip', os.path.join(tmp_folder, new_base))
-        os.rename(base + '.zip', "../result_files/" + new_file_name)
+        shutil.make_archive(base_file_name, 'zip', os.path.join(TMP_FOLDER, base_name_without_spaces))
+        os.rename(base_file_name + '.zip', os.path.join(TMP_FOLDER, xlsx_file))
     except Exception as e:
         print("Error: %s." % e)
 
-    logger.info(f'DataFrame processing of ../result_files/{new_file_name}')
     try:
-        dataframe_processing("../result_files/" + new_file_name, "../result_files/" + new_file_name)
+        dataframe_processing(os.path.join(TMP_FOLDER, xlsx_file), os.path.join(RESULT_FILES_FOLDER, xlsx_file))
     except Exception as e:
-        logger.error(f'Error in data processing of ../result_files/{new_file_name}. Error is {e}')
+        logger.error(f'Error in data processing of {TMP_FOLDER}/{xlsx_file}. Error is {e}')
 
 
 def dataframe_processing(source_file, result_file):
+    logger.info(f'DataFrame processing of {TMP_FOLDER}/{source_file}')
+
     df = pd.read_excel(source_file, header=None)
 
     short_df = df.head(30).copy(deep=True)
@@ -130,6 +130,9 @@ def dataframe_processing(source_file, result_file):
     header_raw = 0
     currencies_columns = set()
     my_tb_start = []
+
+    #sub_df = df.loc[:, (df == 'AA').any()]
+
     for i in range(df.shape[0]):  # iterate over rows
         for j in range(df.shape[1]):  # iterate over columns
             value = df.at[i, j]  # get cell value
@@ -141,7 +144,7 @@ def dataframe_processing(source_file, result_file):
                 if b == 3:
                     break
 
-            if str(value) in currency_set and len(currencies_columns) < 2:
+            if str(value) in CURRENCY_SET and len(currencies_columns) < 2:
                 currencies_columns.add(j)
                 if len(currencies_columns) == 2:
                     b = b + 1
@@ -213,8 +216,9 @@ def dataframe_processing(source_file, result_file):
 
 
 def xls_processing(xls_file):
+    base = os.path.splitext(os.path.basename(xlsx_file))[0]
     logger.info(f'start with file {xls_file}')
-    dataframe_processing("../source_files/" + xls_file, "../result_files/" + base + '.xlsx')
+    dataframe_processing(os.path.join(SOURCE_FILES_FOLDER, xls_file), os.path.join(RESULT_FILES_FOLDER, base + '.xlsx'))
 
 
 def rename_xlsx_file(file_name, df):
@@ -227,7 +231,7 @@ def rename_xlsx_file(file_name, df):
         if input(f'Please, close file {file_name}\nAnd try again. Please, type [Y] for retry or any other for cancel:') == 'Y':
             rename_xlsx_file(file_name, data_df_even)
         else:
-            logger.error(f'break with {file_name}')
+            logger.error(f'Break with {file_name}')
 
 
 def is_date(string, fuzzy=False):
@@ -246,19 +250,28 @@ def is_date(string, fuzzy=False):
 
 
 def delete_tmp_folder(tmp_dir):
-    logger.info(f'Delete tmp dir {tmp_dir}')
+    """
+    Clean folder recursively
+    :param tmp_dir:
+    :return:
+    """
+    logger.info(f'Clean tmp dir {tmp_dir}')
 
-    try:
-        shutil.rmtree(tmp_dir)
-    except OSError as e:
-        logger.error("Error: %s - %s." % (e.filename, e.strerror))
-
-    logger.debug(f'Deleted tmp dir')
+    for filename in os.listdir(tmp_dir):
+        file_path = os.path.join(tmp_dir, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+            logger.debug(f'Deleted tmp dir')
+        except Exception as e:
+            logger.error('Failed to delete %s. Reason: %s' % (file_path, e))
 
 
 if __name__ == '__main__':
 
-    args = parce_args()
+    args = parse_args()
 
     if args.log_level:
         log_level = args.log_level
@@ -267,14 +280,20 @@ if __name__ == '__main__':
 
     set_logger(logger, log_level)
 
-    for xlsx_file in os.listdir("../source_files/"):
-        base = os.path.splitext(os.path.basename(xlsx_file))[0]
-        if xlsx_file.endswith(".xls"):
-            xls_processing(xlsx_file)
-        elif xlsx_file.endswith(".xlsx"):
-            xlsx_processing(xlsx_file)
+    for xlsx_file in os.listdir(SOURCE_FILES_FOLDER):
+        try:
+            if xlsx_file.endswith(".xls"):
+                xls_processing(xlsx_file)
+            elif xlsx_file.endswith(".xlsx"):
+                xlsx_processing(xlsx_file)
 
-    delete_tmp_folder(tmp_folder)
+            logger.info(f'Move {os.path.join(SOURCE_FILES_FOLDER, xlsx_file)} to {os.path.join(CONVERTED_FILES_FOLDER, xlsx_file)}')
+
+            shutil.move(os.path.join(SOURCE_FILES_FOLDER, xlsx_file), os.path.join(CONVERTED_FILES_FOLDER, xlsx_file))
+        except Exception as e:
+            logger.error(e)
+
+    delete_tmp_folder(TMP_FOLDER)
 
     logger.info(f'Done!')
 

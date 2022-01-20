@@ -1,0 +1,21 @@
+TMP_FOLDER: '../tmp'
+RESULT_FILES_FOLDER: '../output'
+SOURCE_FILES_FOLDER: '../input'
+CONVERTED_FILES_FOLDER: '../processed_files'
+MOVE_SOURCE: False
+LOG_LEVEL: 'DEBUG'
+COLUMNS_TO_DELETE: ['Показник', 'Показатель']
+COLUMNS_NOT_CURRENCY:
+    - 'Д'
+    - 'К'
+HEADER_DETECTOR: 'Документ'
+COLUMN_NAMES: 
+    'currency_deb': 'Валюта дебет'
+    'sum_currency_deb': 'Сума у вал. дебет'
+    'currency_credit': 'Валюта кредит'
+    'sum_currency_credit': 'Сума у вал. кредит'
+    'sum_hrn_deb': 'Сума в грн дебет'
+    'sum_hrn_credit': 'Сума в грн кредит'
+    'saldo_currency': 'Сальдо у валюті'
+    'saldo_hrn': 'Сальдо в грн'
+    

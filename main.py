@@ -209,11 +209,17 @@ def dataframe_processing(source_file, result_file):
         if b == 2:
             break
 
-    col_one_list = df[my_tb_start[1]].tolist()[-5:]
+    col_one_list = df[my_tb_start[1]].tolist()[-10:]
 
-    for i, elem in enumerate(col_one_list):  # iterate over rows
-        if not is_date(str(elem)) and not pd.isnull(elem):
-            my_tb_end = df.shape[0] + i - 5
+    #for i, elem in enumerate(col_one_list):  # iterate over rows
+        # if is_date(str(elem)) and not pd.isnull(elem):
+        #     my_tb_end = df.shape[0] + i - 5
+        #     logger.debug(f"my_tb_end: {my_tb_end}")
+        #     break
+
+    for i, elem in enumerate(col_one_list[::-1]):  # iterate over rows
+        if is_date(str(elem)):
+            my_tb_end = df.shape[0] - i + 1
             logger.debug(f"my_tb_end: {my_tb_end}")
             break
 
@@ -320,32 +326,41 @@ def dataframe_processing(source_file, result_file):
     '''Create result dataframe on the base of even data'''
     credit_shift = 0
 
-    data_df_even.insert(debet_column + 2,
-                        config['COLUMN_NAMES']['currency_deb'],
-                        #"Валюта дебет",
-                        data_df_odd.iloc[:, cur_columns_list[0]],
-                        True)
-    credit_shift = credit_shift + 1
+    if len(cur_columns_list) > 0:
+        data_df_even.insert(debet_column + 2,
+                            config['COLUMN_NAMES']['currency_deb'],
+                            #"Валюта дебет",
+                            data_df_odd.iloc[:, cur_columns_list[0]],
+                            True)
+        credit_shift = credit_shift + 1
 
-    data_df_even.insert(debet_column + 3,
-                        #"Сума у вал. дебет",
-                        config['COLUMN_NAMES']['sum_currency_deb'],
-                        data_df_odd.iloc[:, num_columns_list[0]],
-                        True)
+        data_df_even.insert(debet_column + 3,
+                            #"Сума у вал. дебет",
+                            config['COLUMN_NAMES']['sum_currency_deb'],
+                            data_df_odd.iloc[:, num_columns_list[0]],
+                            True)
 
-    credit_shift = credit_shift + 1
+        credit_shift = credit_shift + 1
 
-    data_df_even.insert(credit_column + 2 + credit_shift,
-                        #"Валюта кредит",
-                        config['COLUMN_NAMES']['currency_credit'],
-                        data_df_odd.iloc[:, cur_columns_list[1] if len(cur_columns_list) > 1 else cur_columns_list[0]],
-                        True)
+        data_df_even.insert(credit_column + 2 + credit_shift,
+                            #"Валюта кредит",
+                            config['COLUMN_NAMES']['currency_credit'],
+                            data_df_odd.iloc[:, cur_columns_list[1] if len(cur_columns_list) > 1 else cur_columns_list[0]],
+                            True)
 
-    data_df_even.insert(credit_column + 3 + credit_shift,
-                        #"Сума у вал. кредит",
-                        config['COLUMN_NAMES']['sum_currency_credit'],
-                        data_df_odd.iloc[:, num_columns_list[1]],
-                        True)
+        data_df_even.insert(credit_column + 3 + credit_shift,
+                            #"Сума у вал. кредит",
+                            config['COLUMN_NAMES']['sum_currency_credit'],
+                            data_df_odd.iloc[:, num_columns_list[1]],
+                            True)
+    elif len(num_columns_list) > 0:
+        data_df_even.insert(debet_column + 2,
+                            config['COLUMN_NAMES']['count'],
+                            data_df_odd.iloc[:, num_columns_list[0]],
+                            True)
+        credit_shift = credit_shift + 1
+
+
 
     data_df_even.columns.values[debet_column + 1] = config['COLUMN_NAMES']['sum_hrn_deb'] # 'Сума в грн дебет'
     data_df_even.columns.values[credit_column + 1 + credit_shift] = config['COLUMN_NAMES']['sum_hrn_credit'] #'Сума в грн кредит'
@@ -399,13 +414,19 @@ def dataframe_processing(source_file, result_file):
 
     data_df_even = pd.merge(data_df_even, df_oper, how='left', left_on=['Дебет', "Кредит", 'Знак'], right_on=['Дебет', "Кредит", 'Знак'])
 
-    #data_df_even = pd.merge_ordered(data_df_even, df_oper, on=['Дебет', "Кредит", 'Знак'])
+    #data_df_even['Операция'] = data_df_even['Операция'].replace(r'\s+', config['CARD_NOT_EXIST'], regex=True)
 
-    #right_on = ['Дебет', "Кредит", 'Знак'])
+    #data_df_even.loc[(data_df_even['Дебет'] == 632) & (data_df_even['Операция'] == ''), 'Операция'] = config['CARD_NOT_EXISTS']
+    #data_df_even.loc[(data_df_even['Кредит'] == 632) & (data_df_even['Операция'] == ''), 'Операция'] = config['CARD_NOT_EXISTS']
+
+    # df['points'] = np.where(((df['gender'] == 'male') & (df['pet1'] == df['pet2'])) | (
+    #             (df['gender'] == 'female') & (df['pet1'].isin(['cat', 'dog']))), 5, 0)
+    #
+    data_df_even['Операция'] = np.where(((data_df_even['Дебет'] == 632) & (data_df_even['Операция'].isna())) | (
+                 (data_df_even['Кредит'] == 632) & (data_df_even['Операция'].isna())), config['CARD_NOT_EXISTS'], data_df_even['Операция'])
 
 
-
-    #    print(data_df_even)
+    data_df_even.drop('Знак', axis=1, inplace=True, errors='ignore')
 
     rename_xlsx_file(result_file, data_df_even)
 

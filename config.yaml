@@ -1,4 +1,5 @@
 TMP_FOLDER: '../tmp'
+CARD_NOT_EXISTS: 'Уточнити у клієнта'
 RESULT_FILES_FOLDER: '../output'
 SOURCE_FILES_FOLDER: '../input'
 CONVERTED_FILES_FOLDER: '../processed_files'
@@ -18,4 +19,4 @@ COLUMN_NAMES:
     'sum_hrn_credit': 'Сума в грн кредит'
     'saldo_currency': 'Сальдо у валюті'
     'saldo_hrn': 'Сальдо в грн'
-    
+    'count': 'Кількість'   

@@ -137,9 +137,6 @@ def xlsx_processing(xlsx_file):
 
 def dataframe_processing(source_file, result_file):
     #logger.info(f'DataFrame processing of {TMP_FOLDER}/{source_file}')
-    logger.info(f'DataFrame processing of {source_file}')
-
-    logger.debug('Reading dataframe')
 
     ext = os.path.splitext(os.path.basename(xlsx_file))[1]
     if os.path.splitext(os.path.basename(result_file))[1] == '.xlsb':
@@ -150,7 +147,10 @@ def dataframe_processing(source_file, result_file):
         result_file = result_file.replace('.xls', '.xlsx')
         logger.info(f'result_file {result_file}')
 
+    logger.info('Reading dataframe. It takes a time. Please wait.')
+
     df = pd.DataFrame()
+
     if ext == '.xlsb':
         df = pd.read_excel(source_file, engine='pyxlsb')
     else:
@@ -172,7 +172,7 @@ def dataframe_processing(source_file, result_file):
             except Exception as e:
                 logger.error(f'Exception type is: {e.__class__.__name__}. Error is {e}')
 
-
+    logger.info(f'DataFrame processing of {source_file}')
     short_df = df.head(30).copy(deep=True)
     short_df_tail = df.tail(30).copy(deep=True)
     logger.debug(f'df.columns: {df.columns}')
@@ -184,6 +184,7 @@ def dataframe_processing(source_file, result_file):
     # find data frame structure
     df = df.reset_index(drop=True)
 
+    logger.debug('df.head(10):\n')
     logger.debug(tabulate(df.head(10), tablefmt='psql'))
 
     for i in range(short_df.shape[0]):  # iterate over rows
@@ -211,15 +212,12 @@ def dataframe_processing(source_file, result_file):
 
     col_one_list = df[my_tb_start[1]].tolist()[-10:]
 
-    #for i, elem in enumerate(col_one_list):  # iterate over rows
-        # if is_date(str(elem)) and not pd.isnull(elem):
-        #     my_tb_end = df.shape[0] + i - 5
-        #     logger.debug(f"my_tb_end: {my_tb_end}")
-        #     break
-
-    for i, elem in enumerate(col_one_list[::-1]):  # iterate over rows
+    for i, elem in enumerate(col_one_list[::-1]):  # iterate over rows from the end
         if is_date(str(elem)):
-            my_tb_end = df.shape[0] - i + 1
+            if pd.isna(col_one_list[len(col_one_list)-i]):
+                my_tb_end = df.shape[0] - i + 1
+            else:
+                my_tb_end = df.shape[0] - i
             logger.debug(f"my_tb_end: {my_tb_end}")
             break
 
@@ -334,7 +332,7 @@ def dataframe_processing(source_file, result_file):
                             True)
         credit_shift = credit_shift + 1
 
-        data_df_even.insert(debet_column + 3,
+        data_df_even.insert(debet_column + 2 + credit_shift,
                             #"Сума у вал. дебет",
                             config['COLUMN_NAMES']['sum_currency_deb'],
                             data_df_odd.iloc[:, num_columns_list[0]],
@@ -348,7 +346,9 @@ def dataframe_processing(source_file, result_file):
                             data_df_odd.iloc[:, cur_columns_list[1] if len(cur_columns_list) > 1 else cur_columns_list[0]],
                             True)
 
-        data_df_even.insert(credit_column + 3 + credit_shift,
+        credit_shift = credit_shift + 1
+
+        data_df_even.insert(credit_column + 2 + credit_shift,
                             #"Сума у вал. кредит",
                             config['COLUMN_NAMES']['sum_currency_credit'],
                             data_df_odd.iloc[:, num_columns_list[1]],
@@ -359,6 +359,13 @@ def dataframe_processing(source_file, result_file):
                             data_df_odd.iloc[:, num_columns_list[0]],
                             True)
         credit_shift = credit_shift + 1
+
+        if len(num_columns_list) > 1:
+            data_df_even.insert(credit_column + 2 + credit_shift,
+                                # "Сума у вал. кредит",
+                                config['COLUMN_NAMES']['count'],
+                                data_df_odd.iloc[:, num_columns_list[1]],
+                                True)
 
 
 
@@ -379,10 +386,15 @@ def dataframe_processing(source_file, result_file):
 
     data_df_even.dropna(axis='columns', how='all', inplace=True)
 
+    logger.debug('data_df_even.head(10):')
     logger.debug(tabulate(data_df_even.head(10), tablefmt='psql'))
+    logger.debug('data_df_even.columns:')
     logger.debug(data_df_even.columns)
+    logger.debug('data_df_odd.head(10):')
     logger.debug(tabulate(data_df_odd.head(10), tablefmt='psql'))
+    logger.debug('data_df_odd.dtypes:')
     logger.debug(data_df_odd.dtypes)
+    logger.debug('data_df_odd.columns:')
     logger.debug(data_df_odd.columns)
 
     logger.debug(f'num_columns_list={num_columns_list}')
@@ -427,6 +439,9 @@ def dataframe_processing(source_file, result_file):
 
 
     data_df_even.drop('Знак', axis=1, inplace=True, errors='ignore')
+
+    data_df_even.rename(columns={'sum_hrn_deb': config['COLUMN_NAMES']['sum_hrn_deb'],
+                                 'sum_hrn_credit': config['COLUMN_NAMES']['sum_hrn_credit']}, inplace=True)
 
     rename_xlsx_file(result_file, data_df_even)
 

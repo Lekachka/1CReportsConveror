@@ -3,8 +3,8 @@ CARD_NOT_EXISTS: 'Уточнити у клієнта'
 RESULT_FILES_FOLDER: '../output'
 SOURCE_FILES_FOLDER: '../input'
 CONVERTED_FILES_FOLDER: '../processed_files'
-MOVE_SOURCE: False
-LOG_LEVEL: 'DEBUG'
+MOVE_SOURCE: True
+LOG_LEVEL: 'INFO'
 COLUMNS_TO_DELETE: ['Показник', 'Показатель']
 COLUMNS_NOT_CURRENCY:
     - 'Д'

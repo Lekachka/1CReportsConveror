@@ -10,7 +10,9 @@ COLUMNS_NOT_CURRENCY:
     - 'Д'
     - 'К'
 HEADER_DETECTOR: 'Документ'
-COLUMN_NAMES: 
+COLUMN_NAMES:
+    'debet': 'Дебет'
+    'credit': 'Кредит'
     'currency_deb': 'Валюта дебет'
     'sum_currency_deb': 'Сума у вал. дебет'
     'currency_credit': 'Валюта кредит'
@@ -20,3 +22,4 @@ COLUMN_NAMES:
     'saldo_currency': 'Сальдо у валюті'
     'saldo_hrn': 'Сальдо в грн'
     'count': 'Кількість'   
+    'operation': 'Операція'

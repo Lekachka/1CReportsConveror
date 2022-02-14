@@ -122,12 +122,12 @@ def xlsx_processing(xlsx_file):
         shutil.make_archive(os.path.join(TMP_FOLDER, base_file_name),
                             'zip',
                             os.path.join(TMP_FOLDER, base_name_without_spaces))
-        # os.rename(base_file_name + '.zip', os.path.join(TMP_FOLDER, xlsx_file))
         os.rename(os.path.join(TMP_FOLDER, base_file_name + '.zip'),
                   os.path.join(TMP_FOLDER, xlsx_file))
 
     except Exception as e:
         print("Error: %s." % e)
+        return False
 
     try:
         dataframe_processing(os.path.join(TMP_FOLDER, xlsx_file),
@@ -135,46 +135,51 @@ def xlsx_processing(xlsx_file):
     except Exception as e:
         logger.error(f'Error in data processing of {TMP_FOLDER}/{xlsx_file}.'
                      f'Error is {e}')
+        return False
+
+    return True
 
 
 def dataframe_processing(source_file, result_file):
     # logger.info(f'DataFrame processing of {TMP_FOLDER}/{source_file}')
 
     ext = os.path.splitext(os.path.basename(xlsx_file))[1]
-    if os.path.splitext(os.path.basename(result_file))[1] == '.xlsb':
-        result_file = result_file.replace('.xlsb', '.xlsx')
-        logger.info(f'result_file {result_file}')
+    # if os.path.splitext(os.path.basename(result_file))[1] == '.xlsb':
+    #     result_file = result_file.replace('.xlsb', '.xlsx')
+    result_file = result_file.replace(ext, '.xlsx')
+    #     logger.info(f'result_file {result_file}')
+    #
+    # if os.path.splitext(os.path.basename(result_file))[1] == '.xls':
+    #     result_file = result_file.replace('.xls', '.xlsx')
+    #     logger.info(f'result_file {result_file}')
+    #
+    # logger.info('Reading dataframe. It takes a time. Please wait.')
+    #
+    # df = pd.DataFrame()
+    #
+    # if ext == '.xlsb':
+    #     df = pd.read_excel(source_file, engine='pyxlsb')
+    # else:
+    #     first_type_successful = 0
+    #     try:
+    #         # works with strange old format of excel
+    #         wb = xlrd.open_workbook(source_file, encoding_override='cp1251')
+    #         df = pd.read_excel(wb)
+    #         first_type_successful = 1
+    #     except xlrd.XLRDError:
+    #         pass
+    #     except Exception as e:
+    #         logger.error(f'Exception type is: {e.__class__.__name__}. '
+    #                      f'Error is {e}')
+    #
+    #     if first_type_successful == 0:
+    #         try:
+    #             df = pd.read_excel(source_file, header=None)
+    #         except Exception as e:
+    #             logger.error(f'Exception type is: {e.__class__.__name__}. '
+    #                          f'Error is {e}')
 
-    if os.path.splitext(os.path.basename(result_file))[1] == '.xls':
-        result_file = result_file.replace('.xls', '.xlsx')
-        logger.info(f'result_file {result_file}')
-
-    logger.info('Reading dataframe. It takes a time. Please wait.')
-
-    df = pd.DataFrame()
-
-    if ext == '.xlsb':
-        df = pd.read_excel(source_file, engine='pyxlsb')
-    else:
-        first_type_successful = 0
-        try:
-            # works with strange old format of excel
-            wb = xlrd.open_workbook(source_file, encoding_override='cp1251')
-            df = pd.read_excel(wb)
-            first_type_successful = 1
-        except xlrd.XLRDError:
-            pass
-        except Exception as e:
-            logger.error(f'Exception type is: {e.__class__.__name__}. '
-                         f'Error is {e}')
-
-        if first_type_successful == 0:
-            try:
-                df = pd.read_excel(source_file, header=None)
-            except Exception as e:
-                logger.error(f'Exception type is: {e.__class__.__name__}. '
-                             f'Error is {e}')
-
+    df = read_file_to_dataframe(source_file)
     logger.info(f'DataFrame processing of {source_file}')
     short_df = df.head(30).copy(deep=True)
     # short_df_tail = df.tail(30).copy(deep=True)
@@ -190,6 +195,8 @@ def dataframe_processing(source_file, result_file):
     logger.debug('df.head(10):\n')
     logger.debug(tabulate(df.head(10), tablefmt='psql'))
 
+    my_tb_start_j = -1
+
     for i in range(short_df.shape[0]):  # iterate over rows
         for j in short_df.columns:
             value = short_df.loc[i, j]
@@ -199,11 +206,23 @@ def dataframe_processing(source_file, result_file):
                 header_raw = i
                 b = b + 1
                 logger.debug(f"header_raw: {header_raw}")
+                columns_list = short_df.iloc[header_raw]
+                if my_tb_start_j == -1:
+                    for ind, val in enumerate(columns_list):
+                        if val in ['Период', 'Період', 'Дата']:
+                            my_tb_start_j = ind
+                            break
                 if b == 2:
                     break
 
             # try to convert cell value to date to check the start of data frame
-            if is_date(str(value)) and len(my_tb_start) == 0:
+            if is_date(str(value)) and len(my_tb_start) == 0 and my_tb_start_j != -1 and df.columns.get_loc(j) == my_tb_start_j:
+                my_tb_start = [i, j]
+                b = b + 1
+                logger.debug(f"my_tb_start: {my_tb_start}")
+                if b == 2:
+                    break
+            elif is_date(str(value)) and len(my_tb_start) == 0 and my_tb_start_j == -1:
                 my_tb_start = [i, j]
                 b = b + 1
                 logger.debug(f"my_tb_start: {my_tb_start}")
@@ -405,49 +424,71 @@ def dataframe_processing(source_file, result_file):
     logger.debug(f'num_columns_list={num_columns_list}')
     logger.debug(f'cur_columns_list={cur_columns_list}')
 
-    df_oper = pd.read_csv('categories.conf', sep=";", header=None,
-                          names=["Дебет", "Кредит", "Знак", "Операция"])
+    debet = config['COLUMN_NAMES']['debet']
+    credit = config['COLUMN_NAMES']['credit']
+    operation = config['COLUMN_NAMES']['operation']
+
 
     data_df_even.rename(
         columns={config['COLUMN_NAMES']['sum_hrn_deb']: 'sum_hrn_deb',
                  config['COLUMN_NAMES']['sum_hrn_credit']: 'sum_hrn_credit'},
         inplace=True)
+    df_oper = pd.read_csv('categories.conf', sep=";", header=None,
+                          names=[debet, credit, "Sign", operation]
+                          )
 
-    data_df_even['Знак'] = '+'
+    data_df_even['Sign'] = '+'
     #
-    data_df_even['Дебет'] = data_df_even['Дебет'].astype(int)
-    data_df_even['Кредит'] = data_df_even['Кредит'].astype(int)
+    data_df_even[debet] = data_df_even[debet].astype(int)
+    data_df_even[credit] = data_df_even[credit].astype(int)
 
     data_df_even['sum_hrn_deb'] = pd.to_numeric(data_df_even['sum_hrn_deb'],
                                                 errors='coerce')
     data_df_even['sum_hrn_credit'] = pd.to_numeric(
         data_df_even['sum_hrn_credit'], errors='coerce')
 
-    data_df_even['Знак'] = data_df_even['Знак'].astype(str)
-    df_oper['Дебет'] = df_oper['Дебет'].astype(int)
-    df_oper['Кредит'] = df_oper['Кредит'].astype(int)
-    df_oper['Знак'] = df_oper['Знак'].astype(str)
+    data_df_even['Sign'] = data_df_even['Sign'].astype(str)
+    df_oper[debet] = df_oper[debet].astype(int)
+    df_oper[credit] = df_oper[credit].astype(int)
+    df_oper['Sign'] = df_oper['Sign'].astype(str)
 
-    data_df_even.loc[data_df_even.sum_hrn_deb < 0, "Знак"] = "-"
+    data_df_even.loc[data_df_even.sum_hrn_deb < 0, "Sign"] = "-"
 
     data_df_even = pd.merge(data_df_even,
                             df_oper,
                             how='left',
-                            left_on=['Дебет', "Кредит", 'Знак'],
-                            right_on=['Дебет', "Кредит", 'Знак'])
+                            left_on=[debet, credit, "Sign"],
+                            right_on=[debet, credit, "Sign"])
 
-    data_df_even['Операция'] = np.where(
-        ((data_df_even['Дебет'] == 632) & (data_df_even['Операция'].isna())) | (
-                (data_df_even['Кредит'] == 632) &
-                (data_df_even['Операция'].isna())), config['CARD_NOT_EXISTS'],
-        data_df_even['Операция'])
+    data_df_even[operation] = np.where(
+        ((data_df_even[debet] == 632) & (data_df_even[operation].isna())) | (
+                (data_df_even[credit] == 632) &
+                (data_df_even[operation].isna())), config['CARD_NOT_EXISTS'],
+        data_df_even[operation])
 
-    data_df_even.drop('Знак', axis=1, inplace=True, errors='ignore')
+    data_df_even.drop('Sign', axis=1, inplace=True, errors='ignore')
 
     data_df_even.rename(
         columns={'sum_hrn_deb': config['COLUMN_NAMES']['sum_hrn_deb'],
                  'sum_hrn_credit': config['COLUMN_NAMES']['sum_hrn_credit']},
         inplace=True)
+
+    # Divide strings in columns by \n character
+
+    for column in data_df_even:
+        try:
+            if data_df_even[column].dtypes == object and isinstance(data_df_even.iloc[1][column], str):
+                new_df = data_df_even[column].str.split('\n', expand=True)
+                if len(new_df.columns) > 1:
+                    ind = data_df_even.columns.get_loc(column)
+                    title = column
+                    data_df_even.drop(column, axis=1, inplace=True, errors='ignore')
+                    add_i = 0
+                    for col in new_df:
+                        data_df_even.insert(ind + add_i, title + '_' + str(add_i), new_df[col].values)
+                        add_i += 1
+        except ValueError:
+            pass
 
     rename_xlsx_file(result_file, data_df_even)
 
@@ -458,6 +499,40 @@ def xls_processing(xls_file):
     dataframe_processing(os.path.join(SOURCE_FILES_FOLDER, xls_file),
                          os.path.join(RESULT_FILES_FOLDER,
                                       base + os.path.splitext(xls_file)[1]))
+    return True
+
+
+def read_file_to_dataframe(filename):
+
+    ext = os.path.splitext(os.path.basename(filename))[1]
+
+    logger.info('Reading dataframe. It takes a time. Please wait.')
+
+    df = pd.DataFrame()
+
+    if ext == '.xlsb':
+        df = pd.read_excel(filename, engine='pyxlsb')
+    else:
+        first_type_successful = 0
+        try:
+            # works with strange old format of excel
+            wb = xlrd.open_workbook(filename, encoding_override='cp1251')
+            df = pd.read_excel(wb)
+            first_type_successful = 1
+        except xlrd.XLRDError:
+            pass
+        except Exception as e:
+            logger.error(f'Exception type is: {e.__class__.__name__}. '
+                         f'Error is {e}')
+
+        if first_type_successful == 0:
+            try:
+                df = pd.read_excel(filename, header=None)
+            except Exception as e:
+                logger.error(f'Exception type is: {e.__class__.__name__}. '
+                             f'Error is {e}')
+
+    return df
 
 
 def rename_xlsx_file(file_name, df):
@@ -519,9 +594,7 @@ def remove_source_file(file_to_remove):
                     os.path.join(CONVERTED_FILES_FOLDER, file_to_remove))
 
 
-
 if __name__ == '__main__':
-
     args = parse_args()
 
     log_level = args.log_level
@@ -529,15 +602,16 @@ if __name__ == '__main__':
     set_logger(logger, log_level)
 
     for xlsx_file in os.listdir(SOURCE_FILES_FOLDER):
-        try:
-            if xlsx_file.endswith(".xls"):
-                xls_processing(xlsx_file)
+        #try:
+        if xlsx_file.endswith(".xls"):
+            if xls_processing(xlsx_file):
                 remove_source_file(xlsx_file)
-            elif xlsx_file.endswith(".xlsx") or xlsx_file.endswith(".xlsb"):
-                xlsx_processing(xlsx_file)
+        elif xlsx_file.endswith(".xlsx") or xlsx_file.endswith(".xlsb"):
+            if xlsx_processing(xlsx_file):
                 remove_source_file(xlsx_file)
-        except Exception as ex:
-            logger.error(ex)
+        #except Exception as ex:
+            #logger.error(ex)
+
 
     delete_tmp_folder(TMP_FOLDER)
 

@@ -141,46 +141,13 @@ def xlsx_processing(xlsx_file):
 
 
 def dataframe_processing(source_file, result_file):
-    # logger.info(f'DataFrame processing of {TMP_FOLDER}/{source_file}')
 
     ext = os.path.splitext(os.path.basename(xlsx_file))[1]
-    # if os.path.splitext(os.path.basename(result_file))[1] == '.xlsb':
-    #     result_file = result_file.replace('.xlsb', '.xlsx')
     result_file = result_file.replace(ext, '.xlsx')
-    #     logger.info(f'result_file {result_file}')
-    #
-    # if os.path.splitext(os.path.basename(result_file))[1] == '.xls':
-    #     result_file = result_file.replace('.xls', '.xlsx')
-    #     logger.info(f'result_file {result_file}')
-    #
-    # logger.info('Reading dataframe. It takes a time. Please wait.')
-    #
-    # df = pd.DataFrame()
-    #
-    # if ext == '.xlsb':
-    #     df = pd.read_excel(source_file, engine='pyxlsb')
-    # else:
-    #     first_type_successful = 0
-    #     try:
-    #         # works with strange old format of excel
-    #         wb = xlrd.open_workbook(source_file, encoding_override='cp1251')
-    #         df = pd.read_excel(wb)
-    #         first_type_successful = 1
-    #     except xlrd.XLRDError:
-    #         pass
-    #     except Exception as e:
-    #         logger.error(f'Exception type is: {e.__class__.__name__}. '
-    #                      f'Error is {e}')
-    #
-    #     if first_type_successful == 0:
-    #         try:
-    #             df = pd.read_excel(source_file, header=None)
-    #         except Exception as e:
-    #             logger.error(f'Exception type is: {e.__class__.__name__}. '
-    #                          f'Error is {e}')
 
     df = read_file_to_dataframe(source_file)
     logger.info(f'DataFrame processing of {source_file}')
+
     short_df = df.head(30).copy(deep=True)
     # short_df_tail = df.tail(30).copy(deep=True)
     logger.debug(f'df.columns: {df.columns}')
@@ -209,7 +176,7 @@ def dataframe_processing(source_file, result_file):
                 columns_list = short_df.iloc[header_raw]
                 if my_tb_start_j == -1:
                     for ind, val in enumerate(columns_list):
-                        if val in ['Период', 'Період', 'Дата']:
+                        if val in config['DATE_COLUMN_IN']:
                             my_tb_start_j = ind
                             break
                 if b == 2:

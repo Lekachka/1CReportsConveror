@@ -6,6 +6,7 @@ CONVERTED_FILES_FOLDER: '../processed_files'
 MOVE_SOURCE: True
 LOG_LEVEL: 'INFO'
 COLUMNS_TO_DELETE: ['Показник', 'Показатель']
+DATE_COLUMN_IN: ['Период', 'Період', 'Дата']
 COLUMNS_NOT_CURRENCY:
     - 'Д'
     - 'К'
